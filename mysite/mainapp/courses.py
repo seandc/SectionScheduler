@@ -1,14 +1,18 @@
 courses = {
     'CS111F': {
-        "sections" = [
+        "sections" : [
             "Monday 10pm to 11pm",
             "Tuesday 10pm to 11pm",
             "Wednesday 10pm to 11pm",
             ],
-        "TAs" = [
+        "TAs" : [
+            'Parker',
+            'Parker2'
             ],
-        "students" = [
+        "students" : [
+            "Alice",
+            "Bob",
+            "Charlie",
             ],
         }
-
 }
