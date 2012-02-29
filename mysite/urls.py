@@ -18,4 +18,5 @@ urlpatterns = patterns('',
     url(r'^admin/', include(admin.site.urls)),
 
     (r'^enter_info/(?P<course_id>\w+)$', 'mysite.mainapp.views.availability_form'),
+    (r'^raw_availabilities/(?P<course_id>\w+)$', 'mysite.mainapp.views.raw_availabilities'),
 )

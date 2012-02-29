@@ -103,7 +103,7 @@ TEMPLATE_LOADERS = (
 MIDDLEWARE_CLASSES = (
     'django.middleware.common.CommonMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
-    'django.middleware.csrf.CsrfViewMiddleware',
+    #'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
 )
@@ -150,3 +150,20 @@ LOGGING = {
         },
     }
 }
+
+
+# CAS STUFF
+
+AUTHENTICATION_BACKENDS = (
+    'cas_consumer.backends.CASBackend',
+    )
+
+LOGIN_URL = '/login/'
+LOGOUT_URL = '/logout/'
+
+CAS_BASE = 'https://login.dartmouth.edu/cas/'
+CAS_SERVICE = 'http://hacktown.cs.dartmouth.edu/caslogin'
+CAS_NEXT_DEFAULT = 'http://hacktown.cs.dartmouth.edu/dds'
+CAS_COMPLETELY_LOGOUT = True
+CAS_REDIRECT_ON_LOGOUT = 'http://hacktown.cs.dartmouth.edu/dds/bye'
+CAS_LOGOUT_URL = 'https://login.dartmouth.edu/logout.php'
