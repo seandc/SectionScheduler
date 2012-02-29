@@ -8,3 +8,7 @@ from django.utils import simplejson
 def home(request):
     data = {}
     return render_to_response('index.html', data)
+
+def availability_form(request, course_id):
+    data = {}
+    return render_to_response('availability_form.html', data)
