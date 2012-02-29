@@ -1,4 +1,19 @@
-asdf
+<h1>
+SECTIONTIME
+</h1>
 <form method="POST" action="SELF">
-<input type="">
+<fieldset>
+<input type="hidden" name="dnd_name" value="{{ dnd_name }}" />
+<input type="hidden" name="is_male" value="{{ dnd_name }}" />
+<fieldset>
+{% for section in sections %}
+<input type="checkbox" name="{{section}}" value="1"> {{section}} <br />
+{% endfor %}
+</fieldset>
+{% if is_ta %}
+Say who you can't be with: <br />
+<textarea name="cant_be_with">
+</textarea>
+{% endif %}
+</fieldset>
 </form>
