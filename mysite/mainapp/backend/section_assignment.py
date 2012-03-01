@@ -144,14 +144,12 @@ def generate_availability_problem(data, use_fast_constraint = False):
         availabilities = student['section_availability_ordered']
 
         # Check if they are a ta
-        if student['is_ta'] == 'True':
+        if student['is_ta']:
             leaders.append(name)
             leader_domains.append(set(availabilities))
-        elif student['is_ta'] == 'False':
+        else:
             students.append(name)
             student_domains.append(set(availabilities))
-        else:
-            raise ValueError('Invalid value for is_ta field')
 
     leader_count = len(leaders)
     student_count = len(students)
@@ -174,17 +172,20 @@ def generate_availability_problem(data, use_fast_constraint = False):
     for i in range(leader_count):
         X[i] = leaders[i]
         name_to_int[leaders[i]] = i
-        gender_table[i] = 0 if data[leaders[i]]['is_male'] == 'True' else 1 
+        gender_table[i] = 0 if data[leaders[i]]['is_male'] == 'true' else 1 
     for i in range(student_count):
         X[i + leader_count] = students[i] 
         name_to_int[students[i]] = i + leader_count
-        gender_table[i + leader_count] = 0 if data[students[i]]['is_male'] == 'True' else 1 
+        gender_table[i + leader_count] = 0 if data[students[i]]['is_male'] == 'frue' else 1 
 
     # Initialize and empty list of binary constraints
     bin_constraints = []
     for name in data:
         for r in data[name]['cant_be_with']:
-            bin_constraints.append(not_equal(name_to_int[name], name_to_int[r]))
+            print r
+            if r in data:
+                print "hit"
+                bin_constraints.append(not_equal(name_to_int[name], name_to_int[r]))
 
     # Initialize the domain as empty sets
     D = [set() for i in range(leader_count + student_count)]

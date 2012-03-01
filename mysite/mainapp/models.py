@@ -1,5 +1,6 @@
 from django.db import models
 from django.contrib.auth.models import User
+import json
 
 class StudentAvailability(models.Model):
     #user = models.OneToOneField(User)
@@ -16,6 +17,6 @@ class StudentAvailability(models.Model):
         return {
             'is_ta' : self.is_ta,
             'is_male' : self.is_male,
-            'cant_be_with' : self.cant_be_with,
-            'section_availability_ordered' : self.section_availability_ordered,
+            'cant_be_with' : json.loads(self.cant_be_with),
+            'section_availability_ordered' : json.loads(self.section_availability_ordered),
             }

@@ -16,7 +16,7 @@ import urllib
 import mysite.settings
 import dnd
 
-import backend
+from backend import assign_students
 
 # HELPERS
 
@@ -28,13 +28,16 @@ def get_dnd_info(name):
 def dnd_name_from_token(token):
     return token.split('@')[0]
 
-def availabilities_as_json(course_id):
+def availabilities_as_dict(course_id):
     relevant_availabilities = StudentAvailability.objects.filter(course_id=course_id).all()
     data = []
     for availability in relevant_availabilities:
         data.append((availability.dnd_name, availability.as_dict()))
     data = dict(data)
-    return pprint.pformat(data)
+    return data
+
+def availabilities_as_json(course_id):
+    return pprint.pformat(json.dumps(availabilities_as_dict(course_id)))
 
 
 # VIEWS
@@ -48,15 +51,15 @@ def raw_availabilities(request, course_id):
 
 @login_required
 def assignment(request, course_id):
+    '''
     # only let them proceed if they are a professor
     user_info = get_dnd_info(dnd_name_from_token(request.user.username))
     if not user_info['dept'] == 'Computer Science':
         return HttpResponse('you must be a prof in order to see this')
-    json_availabilities = availabilities_as_json(course_id)
-    dict_availabilities = json.loads(json_availabilities)
-    assignments = assign_students(dict_availabilities)
-    print assignment
-    return HttpResponse(assignment)
+    '''
+    dict_availabilities = availabilities_as_dict(course_id)
+    assignments = assign_students.assign_students(dict_availabilities)
+    return HttpResponse(pprint.pformat(assignments))
 
 
 @login_required
