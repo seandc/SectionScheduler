@@ -15,7 +15,7 @@ courses = {
             "Wednesday 10pm to 11pm",
             ],
         "TAs" : [
-            #'D. Parker Phinney',
+            'D. Parker Phinney',
             'Parker2'
             ],
         "students" : [

@@ -74,13 +74,8 @@ def availability_form(request, course_id):
         sa, new = StudentAvailability.objects.get_or_create(dnd_name=dnd_name)
         if not new:
             prepopulate = True
-            is_male = sa.is_male
-            if is_male:
-                data['male_checked'] = True
-                data['female_checked'] = False
-            else:
-                data['female_checked'] = True
-                data['male_checked'] = False
+            data['male_checked'] = sa.is_male
+            data['female_checked'] = not data['male_checked']
             available_sections = json.loads(sa.section_availability_ordered)
             sections_scores = zip(available_sections, range(1,len(available_sections)+1))
             for section, score in sections_scores:
@@ -124,21 +119,24 @@ def availability_form(request, course_id):
         # get their DND name
         # (we got one from post, but let's not trust it)
         dnd_name = dnd_name_from_token(request.user.username)
-        is_ta = False
-        if dnd_name in course_info['TAs']:
-            is_ta = True
-        sa.is_ta = is_ta
-        sa.course_id = course_id
-
+        # make the availability obj
         sa, new = StudentAvailability.objects.get_or_create(dnd_name=dnd_name)
-        sa.is_male = request.POST['is_male']
+        # set course_id
+        sa.course_id = course_id
+        # set is_ta
+        # (again, don't trust anything coming over post)
+        sa.is_ta = False
+        if dnd_name in course_info['TAs']:
+            sa.is_ta = True
+        # set is_male
+        sa.is_male = request.POST['is_male'] == '1'
 
-        # get the cant be with
+        # set cant be with
         if request.POST.get('cant_be_with', False):
             cant_be_with = request.POST.getlist('cant_be_with')
             sa.cant_be_with = json.dumps(cant_be_with)
 
-        # get the section availability
+        # set section availability
         priority_sections = []
         for section in course_info['sections']:
             priority = request.POST.get(section, '')
