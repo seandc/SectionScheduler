@@ -9,6 +9,9 @@ urlpatterns = patterns('',
     # url(r'^$', 'mysite.views.home', name='home'),
     # url(r'^mysite/', include('mysite.foo.urls')),
 
+    (r'^accounts/login/$', 'django_cas.views.login'),
+    (r'^accounts/logout/$', 'django_cas.views.logout'),
+
     (r'^$', 'mysite.mainapp.views.home'),
 
     # Uncomment the admin/doc line below to enable admin documentation:
