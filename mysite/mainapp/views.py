@@ -73,11 +73,11 @@ def availability_form(request, course_id):
             prepopulate = True
             is_male = sa.is_male
             if is_male:
-                data['male_checked'] = 'checked'
-                data['female_checked'] = ''
+                data['male_checked'] = True
+                data['female_checked'] = False
             else:
-                data['female_checked'] = 'checked'
-                data['male_checked'] = ''
+                data['female_checked'] = True
+                data['male_checked'] = False
             available_sections = json.loads(sa.section_availability_ordered)
             sections_scores = zip(available_sections, range(1,len(available_sections)+1))
             for section, score in sections_scores:
