@@ -48,6 +48,8 @@ def availability_form(request, course_id):
         # get their DND name
         dnd_name = dnd_name_from_token(request.user.username)
 
+        # TODO: if they have already filled in the form, prepopulate
+
         # figure out if they're a TA
         is_ta = False
         if dnd_name in course_info['TAs']:
@@ -64,11 +66,12 @@ def availability_form(request, course_id):
         return render_to_response('availability_form.html', data)
     # HANDLE THE FORM INPUT
     elif request.method == 'POST':
+        # TODO: pre-validate form and spit out an error if they failed
         # get their DND name
         # (we got one from post, but let's not trust it)
         dnd_name = dnd_name_from_token(request.user.username)
 
-        sa = StudentAvailability.objects.get_or_create(dnd_name=dnd_name)[1]
+        sa = StudentAvailability.objects.get_or_create(dnd_name=dnd_name)[0]
         sa.course_id = course_id
         sa.is_male = request.POST['is_male']
         sa.is_ta = request.POST['is_ta']
@@ -77,10 +80,14 @@ def availability_form(request, course_id):
         cant_be_with = []
 
         # TODO: get the section availability
-        section_availability = []
+        priority_sections = []
         for section in course_info['sections']:
-            if section in request.POST:
-                section_availability.append(section)
+            priority = request.POST.get(section, '')
+            if priority != '':
+                priority = int(priority)
+                priority_sections.append((priority, section))
+        priority_sections.sort()
+        section_availability = [section for priority, section in priority_sections]
         section_availability_json = json.dumps(section_availability)
         sa.section_availability_ordered = section_availability_json
 
