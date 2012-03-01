@@ -62,17 +62,32 @@ def availability_form(request, course_id):
             is_ta = True
 
         data = {
+            'course_id' : course_id,
             'sections' : course_info['sections'],
             'is_ta' : is_ta,
             'students' : course_info['students'],
             'dnd_name' : dnd_name,
-            'action' : request.get_full_path(),
+            'action' : request.get_full_path().split('?')[0],
             'success' : request.GET.get('success', False),
+            'invalid' : request.GET.get('invalid', False),
             }
         return render_to_response('availability_form.html', data)
+
     # HANDLE THE FORM INPUT
     elif request.method == 'POST':
-        # TODO: pre-validate form and spit out an error if they failed
+        def form_is_valid(post_data):
+            print post_data
+            if not post_data.get('is_male', False):
+                return False
+            if not post_data.get('is_ta', False):
+                return False
+            if not [section for section in request.POST if section in course_info['sections'] and request.POST[section]]:
+                return False
+            return True
+        if not form_is_valid(request.POST):
+            # tell them to re-do the form
+            redirect_url = request.get_full_path() + '?invalid=1'
+            return HttpResponseRedirect(redirect_url)
         # get their DND name
         # (we got one from post, but let's not trust it)
         dnd_name = dnd_name_from_token(request.user.username)
@@ -82,8 +97,10 @@ def availability_form(request, course_id):
         sa.is_male = request.POST['is_male']
         sa.is_ta = request.POST['is_ta']
 
-        # TODO: get the cant be with
-        cant_be_with = [key.replace('cant_be_with', '') for key in request.POST.keys() if 'cant_be_with' in key]
+        # get the cant be with
+        if request.POST.get('cant_be_with', False):
+            cant_be_with = request.POST.getlist('cant_be_with')
+            sa.cant_be_with = json.dumps(cant_be_with)
 
         # TODO: get the section availability
         priority_sections = []

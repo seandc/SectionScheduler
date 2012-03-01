@@ -1,12 +1,32 @@
+<html>
+<head>
+<title>
+CS section chooser
+</title>
+<style type="text/css">
+body {width: 500px; margin: auto; margin-top: 30px;}
+fieldset {border: none;}
+input[type="text"] {width: 2em;}
+</style>
+</head>
+<body>
+
 {% if success %}
 SUCCESS! THANKS!
 {% endif %}
+{% if invalid %}
+ERROR with your submission
+{% endif %}
+
 <h1>
-HEY {{ dnd_name }}
+Register for a COSC course section ({{course_id}})
 </h1>
 <h2>
-Register for a CS course section here
+We think you're {{ dnd_name }}
 </h2>
+<h3>
+If that's wrong, <a href="/accounts/logout">click here</a>
+</h3>
 
 
 <form method="POST" action="{{action}}">
@@ -32,9 +52,9 @@ Available Section Times: <br />
 {% if is_ta %}
 Say who you can't be with: <br />
 (Shift+click for multiple) <br />
-<select multiple="multiple" size="5" id="mysel" name="countries"> 
+<select multiple="multiple" size="5" id="mysel" name="cant_be_with"> 
 {% for student in students %}
- <option value="cant_be_with_{{student}}">{{student}}</option> 
+ <option value="{{student}}">{{student}}</option> 
 {% endfor %}
 </select>
 {% endif %}
@@ -44,3 +64,5 @@ Say who you can't be with: <br />
 <input type="submit" value="Submit" />
 </fieldset>
 </form>
+</body>
+</html>
