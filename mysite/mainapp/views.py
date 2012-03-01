@@ -12,9 +12,13 @@ from mysite.mainapp.models import StudentAvailability
 
 import json
 import pprint
-import cas
 import urllib
 import mysite.settings
+import dnd
+
+def get_dnd_info(name):
+    record = d.lookup_unique(name, 'NAME', "NICKNAME", "UID")
+    return recrod
 
 def home(request):
     data = {}
@@ -29,6 +33,9 @@ def raw_availabilities(request, course_id):
     the_json_str = pprint.pformat(data)
     return HttpResponse(the_json_str)
 
+def dnd_name_from_token(token):
+    return token.split('@')[0]
+
 @login_required
 def availability_form(request, course_id):
 
@@ -37,25 +44,18 @@ def availability_form(request, course_id):
 
     # DISPLAY THE FORM
     if request.method == 'GET':
-        c = cas.CASClient(CAS_ENDPOINT_URL, WEBAPP_LOGIN_URL)
-        #id = c.Authenticate(request.GET.get('ticket', None))
-        id = c.Authenticate(False)
-        print id
-
-
-        # TODO: figure out if they're a TA
-        is_ta = False
-
-        # TODO: figure out if they're male
-        is_male = True
 
         # get their DND name
-        dnd_name = request.user.username
+        dnd_name = dnd_name_from_token(request.user.username)
+
+        # figure out if they're a TA
+        is_ta = False
+        if dnd_name in course_info['TAs']:
+            is_ta = True
 
         data = {
             'sections' : course_info['sections'],
             'is_ta' : is_ta,
-            'is_male' : is_male,
             'dnd_name' : dnd_name,
             'action' : request.get_full_path(),
             'success' : request.GET.get('success', False),
@@ -63,9 +63,13 @@ def availability_form(request, course_id):
         return render_to_response('availability_form.html', data)
     # HANDLE THE FORM INPUT
     elif request.method == 'POST':
+        # get their DND name
+        # (we got one from post, but let's not trust it)
+        dnd_name = dnd_name_from_token(request.user.username)
+
         sa = StudentAvailability()
         sa.course_id = course_id
-        sa.dnd_name = request.POST['dnd_name']
+        sa.dnd_name = dnd_name
         sa.is_male = request.POST['is_male']
         sa.is_ta = request.POST['is_ta']
 

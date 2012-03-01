@@ -2,12 +2,17 @@
 SUCCESS! THANKS!
 {% endif %}
 <h1>
-SECTIONTIME
+HEY {{ dnd_name }}
 </h1>
+<h2>
+Register for a CS course section here
+</h2>
+
+
 <form method="POST" action="{{action}}">
 <fieldset>
 <input type="hidden" name="dnd_name" value="{{ dnd_name }}" />
-<input type="hidden" name="is_male" value="{{ is_male }}" />
+<input type="checkbox" name="is_male" value="1" /> Are a guy? <br />
 <input type="hidden" name="is_ta" value="{{ is_ta }}" />
 <fieldset>
 {% for section in sections %}
