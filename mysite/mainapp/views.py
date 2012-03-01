@@ -16,6 +16,8 @@ import urllib
 import mysite.settings
 import dnd
 
+import backend
+
 # HELPERS
 
 def get_dnd_info(name):
@@ -51,7 +53,10 @@ def assignment(request, course_id):
     if not user_info['dept'] == 'Computer Science':
         return HttpResponse('you must be a prof in order to see this')
     json_availabilities = availabilities_as_json(course_id)
-    # TODO
+    dict_availabilities = json.loads(json_availabilities)
+    assignments = assign_students(dict_availabilities)
+    print assignment
+    return HttpResponse(assignment)
 
 
 @login_required
