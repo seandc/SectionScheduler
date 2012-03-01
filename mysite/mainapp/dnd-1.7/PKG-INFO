@@ -1,0 +1,22 @@
+Metadata-Version: 1.0
+Name: dnd
+Version: 1.7
+Summary: Dartmouth Name Directory client library
+Home-page: http://www.cs.dartmouth.edu/~sting/sw/#dnd
+Author: M. J. Fromberger
+Author-email: michael.j.fromberger@gmail.com
+License: UNKNOWN
+Description: 
+        Implements a client for the Dartmouth Name Directory (DND), a central
+        database of public user information used by the BlitzMail system
+        developed at Dartmouth College.  While not widely used, this protocol
+        may be of interest to developers at those sites that do use BlitzMail.
+        
+Platform: UNKNOWN
+Classifier: Development Status :: 5 - Production/Stable
+Classifier: Intended Audience :: Developers
+Classifier: License :: Freeware
+Classifier: Operating System :: OS Independent
+Classifier: Programming Language :: Python
+Classifier: Topic :: Internet
+Classifier: Topic :: Software Development :: Libraries :: Python Modules

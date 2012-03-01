@@ -1,0 +1,124 @@
+#!/usr/bin/env python
+
+##
+## Name:     makelist
+## Purpose:  Generate a sorted list of names or e-mail addresses.
+## Author:   M. J. Fromberger <http://www.dartmouth.edu/~sting/>
+## Info:     $Id: makelist 742 2007-01-06 18:49:24Z sting $
+##
+
+import os, re, sys
+from getopt import getopt, GetoptError
+import dnd
+
+# Get the format and sort key from the environment, if available
+output_fmt = os.getenv('LIST_FORMAT') or '"%(name)" <%(email)>'
+sort_key   = os.getenv('SORT_KEY') or "lastname"
+dnd_host   = None
+output_fp  = sys.stdout
+stop_err   = True       # Stop when ambiguous or missing names found?
+
+try:
+    (opts, args) = getopt(sys.argv[1:],
+                          'd:ef:k:o:h',
+                          ( 'dnd', 'format', 'key', 'noerr', 'output',
+                            'help' ))
+    
+except GetoptError, e:
+    print >> sys.stderr, \
+          "Error: %s\n -- Use 'makelist --help' for assistance" % e
+    sys.exit(1)
+
+for (opt, val) in opts:
+    if opt in ('-d', '--dnd'):
+        dnd_host = val
+    elif opt in ('-f', '--format'):
+        output_fmt = val
+    elif opt in ('-k', '--key'):
+        sort_key = val
+    elif opt in ('-e', '--noerr'):
+        stop_err = False
+    elif opt in ('-o', '--output'):
+        try:
+            output_fp = file(val, 'w')
+        except IOError, e:
+            print >> sys.stderr, "Error opening output file '%s':\n" \
+                  " -- %s" % (val, e)
+            sys.exit(1)
+    elif opt in ('-h', '--help'):
+        print >> sys.stderr, \
+              """Usage is:  makelist [options] [filenames*]
+
+Supported options include:
+  -d, --dnd <host>    : specify which name directory to use.
+  -f, --format <fmt>  : specify the output format.
+  -k, --key <field>   : specify field to sort on (default "%s").
+  -e, --noerr         : do not stop on missing/ambiguous names.
+  -o, --output <path> : specify output file name.
+  -h, --help          : display this message.
+
+If no files are specified, input is read from standard input; if no
+output file is specified, results are written to standard output.
+
+Missing or ambiguous user names are ordinarily considered errors, and
+abort the program.  Using the '-e' (--noerr) command line option
+causes these to be warnings only; with this option, all records
+matching a given name will be included in the output.
+
+Entries which occur multiple times in the input are folded so that
+they occur only once in the output.
+""" % sort_key
+        sys.exit(0)
+
+# Extract the fields needed from the format
+fields = [ f.lower() for f in dnd.get_format_fields(output_fmt) ]
+if sort_key not in fields:
+    fields.append(sort_key)
+
+# Read from files on the command line; if none are given, read from
+# standard input.
+if len(args) == 0:
+    args.append('-')
+
+names = []
+for fp in ( (x == '-' and sys.stdin) or file(x, 'rU')
+            for x in args ):
+    names.extend(line.strip() for line in fp
+                 if not re.match('\s*$', line))
+    fp.close()
+
+# Look up all users in the name directory and sort by surname
+db = dnd.DNDSession(server = dnd_host, default_fields = fields)
+
+def by_sortkey(key):
+    def by_field(a, b):
+        return cmp(getattr(a, key).lower(),
+                   getattr(b, key).lower())
+    
+    return by_field
+
+lst = set() ; errors = False
+for name in names:
+    try:
+        fnd = db.lookup(name)
+        if len(fnd) > 1:
+            print >> sys.stderr, '>> %s: "%s": ambiguous name' % \
+                  ((stop_err and "Error") or "Warning", name)
+            errors = True
+        
+        lst.update(fnd)
+    except dnd.DNDError, e:
+        print >> sys.stderr, '>> %s: "%s": %s' % \
+              ((stop_err and "Error") or "Warning", name, e)
+        errors = True
+
+# Stop if errors were detected.  This is deferred so that all of the
+# bad guys can have their error messages displayed.
+if errors and stop_err:
+    sys.exit(1)
+
+print >> output_fp, \
+      '\n'.join(dnd.format_fields(output_fmt, z) for z in
+                sorted(lst, cmp = by_sortkey(sort_key)))
+
+# Here there be dragons

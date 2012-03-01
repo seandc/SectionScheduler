@@ -1,0 +1,245 @@
+#!/usr/bin/env python
+
+##
+## groupedit.py
+##
+## Edit a group in the Dartmouth Name Directory
+##
+## by Michael J. Fromberger <http://www.dartmouth.edu/~sting/>
+## Copyright (C) 2004 Michael J. Fromberger, All Rights Reserved.
+##
+## Permission is hereby granted, free of charge, to any person
+## obtaining a copy of this software and associated documentation
+## files (the "Software"), to deal in the Software without
+## restriction, including without limitation the rights to use, copy,
+## modify, merge, publish, distribute, sublicense, and/or sell copies
+## of the Software, and to permit persons to whom the Software is
+## furnished to do so, subject to the following conditions:
+## 
+## The above copyright notice and this permission notice shall be
+## included in all copies or substantial portions of the Software.
+## 
+## THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+## EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+## MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+## NONINFRINGEMENT.  IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
+## HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
+## WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+## OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
+## DEALINGS IN THE SOFTWARE.
+##
+## $Id: groupedit 151 2006-05-20 16:51:42Z sting $
+##
+import dnd, getpass, os, sys, re
+
+pw_env = "DND_PASSWORD"
+
+def load_group(group, pw):
+    d = dnd.DNDSession()
+    
+    try:
+        members = d.group_list(group, pw, 'name', 'lastname', 'uid', 'url')
+        return members
+    finally:
+        d.close()
+
+def add_user(user, group, pw):
+    d = dnd.DNDSession()
+    
+    try:
+        d.group_add(user, group, pw)
+    finally:
+        d.close()
+
+def del_user(user, group, pw):
+    d = dnd.DNDSession()
+    
+    try:
+        d.group_remove(user, group, pw)
+    finally:
+        d.close()
+
+def user_info(user):
+    d = dnd.DNDSession()
+    
+    try:
+        res = d.lookup_unique(user, "name", "nickname", "uid", "gid", "url")
+        if res is False:
+            raise ValueError("Ambiguous user name: %s" % user)
+
+        return res
+    finally:
+        d.close()
+
+def groups_info(groups):
+    d = dnd.DNDSession()
+    
+    out = []
+    try:
+        for grp in groups:
+            if not grp:
+                continue
+            
+            try:
+                out.append(d.lookup_unique('#' + grp, "name", "uid"))
+            except dnd.DNDProtocolError, e:
+                if e.key == 520:
+                    out.append({'name': 'Unknown (invalid)', 'uid': grp})
+                else:
+                    raise
+        return out
+    finally:
+        d.close()
+
+def main():
+    # Get group name from argument list, if available; otherwise, try to
+    # read it from standard input, assuming there's a terminal attached
+    if len(sys.argv) > 1:
+        group_name = ' '.join(sys.argv[1:])
+    elif sys.stdin.isatty():
+        sys.stderr.write('Group name: ')
+        group_name = sys.stdin.readline().strip()
+    else:
+        sys.stderr.write('Unable to read from standard input (not a tty)\n')
+        sys.exit(1)
+
+    # Get the group password
+    group_pass = getpass.getpass('Password for "%s": ' % group_name)
+    
+    # Set up to do the command processing loop
+    brk = re.compile('[ \t]+')
+    prompt = sys.stderr.write
+    prompt("[type `help' or `?' for help with commands]\n")
+    3
+    group_members = None
+    need_reload = 0
+
+    while(True):
+        if group_members is None or need_reload:
+            try:
+                prompt('Loading members of group "%s" ... ' % group_name)
+                group_members = sorted(load_group(group_name, group_pass),
+                                       key = lambda rec: rec.name.lower())
+                prompt('<done>\n')
+                need_reload = 0
+            except dnd.DNDError, e:
+                print "\nUnable to load group `%s': %s" % (group_name, e)
+                sys.exit(1)
+        
+        prompt('>> ')
+        command = sys.stdin.readline()
+        if command == '':
+            sys.stderr.write('[EOF]')
+            command = 'quit'
+        else:
+            command = command.strip()
+        
+        args = brk.split(command, 1)
+        key = args[0].lower()
+        
+        if key == 'quit':
+            break
+        elif key == 'add':
+            if len(args) <> 2:
+                print "Usage: add <username>"
+                continue
+            
+            user = args[1]
+            try:
+                add_user(user, group_name, group_pass)
+                print "User added."
+                need_reload = 1
+            except dnd.DNDError, e:
+                if e.key == 520:
+                    print "User `%s' is already in the group." % user
+                else:
+                    print "Error adding user to group: %s" % e
+        elif key == 'del':
+            if len(args) != 2:
+                print "Usage: del <username>"
+                continue
+        
+            user = args[1]
+            try:
+                del_user(user, group_name, group_pass)
+                print "User removed."
+                need_reload = 1
+            except dnd.DNDError, e:
+                if e.key == 520:
+                    print "User `%s' is not a member of the group." % user
+                else:
+                    print "Error removing user from group: %s" % e
+        elif key == '?' or key == 'help':
+            print """Commands available include:
+            add <user>    -- add specified user to this group
+            del <user>    -- remove specified user from this group
+            group <group> -- select a new group to edit
+            info <user>   -- look up information on a given user
+            list          -- list the members of the group
+            reload        -- reload the group list
+            help, ?       -- print this help message
+            quit          -- exit the program
+            """
+        elif key == 'info':
+            if len(args) != 2:
+                print "Usage: info <username>"
+                continue
+        
+            try:
+                info = user_info(args[1])
+                spaces = re.compile(' +'); groups = spaces.split(info['gid'])
+                if len(groups) > 0:
+                    groups = groups_info(groups)
+            
+                print "Information for `%s', uid %s:" % (info['name'], info['uid'])
+                if info['nickname'] != '':
+                    print "Nicknames:  %s" % info['nickname']
+                if info['url'] != '':
+                    print "URL:        %s" % info['url']
+                if len(groups) > 0:
+                    print "Groups:"
+
+                    for grp in groups:
+                        print "  %-28s %s" % (grp['name'], grp['uid'])
+            except ValueError, e:
+                if e[1] == "Ambiguous username":
+                    print "That user name matches more than one person."
+                else:
+                    raise
+            except dnd.DNDError, e:
+                print "Error looking up this user: %s" % e
+        elif key == 'group':
+            if len(args) != 2:
+                print "Usage: group <groupname>"
+                continue
+        
+            group_name = args[1]
+            group_pass = getpass.getpass('Password for "%s": ' % group_name)
+            need_reload = 1
+            print "Changed group to \"%s\"" % group_name
+        elif key == 'list':
+            if len(group_members) > 0:
+                name_w = max([ len(p['name']) for p in group_members ])
+                uid_w  = max([ len(p['uid']) for p in group_members ])
+                url_w = 80 - (name_w + uid_w + 2)
+                fmt = "%%-%ds %%-%ds %%s" % (name_w, uid_w)
+                print fmt % ( "Name", "UID", "URL" )
+                print "-" * 72
+                for person in group_members:
+                    url = person['url']
+                    if len(url) > url_w:
+                        url = url[:url_w - 3] + "..."
+                    print fmt % ( person['name'], person['uid'], url )
+        
+            print "%d members in group `%s'." % (len(group_members), group_name)
+        elif key == 'reload':
+            need_reload = 1
+        elif key == '':
+            pass
+        else:
+            prompt("[that command is not understood, use `?' for help]\n")
+
+if __name__ == "__main__":
+    main()
+
+# --- Here there be dragons ---

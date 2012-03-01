@@ -1,0 +1,246 @@
+#!/usr/bin/env python
+
+##
+## Name:     dndquery
+## Purpose:  A simple command-line tool that performs DND queries.
+## Author:   M. J. Fromberger <http://www.dartmouth.edu/~sting/>
+##           Copyright (C) 2004 Michael J. Fromberger, All Rights Reserved.
+## Info:     $Id: dndquery 744 2007-01-06 19:01:00Z sting $
+##
+## Permission is hereby granted, free of charge, to any person
+## obtaining a copy of this software and associated documentation
+## files (the "Software"), to deal in the Software without
+## restriction, including without limitation the rights to use, copy,
+## modify, merge, publish, distribute, sublicense, and/or sell copies
+## of the Software, and to permit persons to whom the Software is
+## furnished to do so, subject to the following conditions:
+## 
+## The above copyright notice and this permission notice shall be
+## included in all copies or substantial portions of the Software.
+## 
+## THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+## EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+## MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+## NONINFRINGEMENT.  IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
+## HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
+## WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+## OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
+## DEALINGS IN THE SOFTWARE.
+##
+
+import os, sys, re
+import dnd
+from getopt import getopt, GetoptError
+
+# Built-in templates
+format_templates = {
+    'email':   { 'query': '"%(name)" <%(email)>',
+                 'desc': 'Outputs e-mail address in RFC-2822 format.' },
+
+    'dart':    { 'query':
+                 '%<32(name) %<=15(phone) %<8(hinmanaddr) ' \
+                 '%<=20(deptclass)',
+                 'desc': 'A standard lookup query for Dartmouth College.' },
+
+    'sig':     { 'query':
+                 '-- \n'
+                 '%(name)\n'
+                 'E-Mail: %(email)',
+                 'desc': 'Outputs a signature suitable for e-mail or Usenet.' },
+
+    'alumni':  { 'dnd': 'dnd.dartmouth.org',
+                 'query': '%<30(name) %<15(class) %(mailaddr)',
+                 'desc': 'A standard lookup query for the Vox Alumni Network.' },
+
+    'long':    { 'query':
+                 'Name:       %(name)\n'
+                 'Nickname:   %(nickname/<none>)\n'
+                 'Phone:      %(phone)\n'
+                 'HB:         %(hinmanaddr)\n'
+                 'Dept/Class: %(deptclass)\n'
+                 'Category:   %(edupersonprimaryaffiliation/<unknown>) '
+                 '(%(affiliation))\n'
+                 'E-Mail:     %(email)\n'
+                 'Blitzserv:  %(blitzserv)\n'
+                 'URL:        %(url/<none defined>)\n'
+                 'ID Number:  %(dctsnum)',
+                 'separator': '\n-- \n',
+                 'desc': 'Detailed information about a Dartmouth user.' },
+
+    'vnet':    { 'query':
+                 '%<32(name)\n'
+                 '%(street/<address unknown>)\n%(town/?), %(state/?)  %(zip/?)\n'
+                 'Home:   %(homephone/<unknown>)\n'
+                 'Work:   %(busphone/<unknown>)\n'
+                 'E-mail: %(email)',
+                 'dnd':  'dnd.valley.net',
+                 'separator': '\n-- \n',
+                 'desc': 'A standard lookup query for ValleyNet users.' },
+    
+    'web':     { 'query': '<a href="%(url/??)">%(name)</a>',
+                 'desc': 'Output an HTML anchor tag for the URL.' },
+    
+    'default': { 'query': '%<32(name) %(nickname)',
+                 'desc': 'A default query usable for any DND.' } }
+
+# Get default query template name
+default_template = os.getenv('DND_TEMPLATE') or 'default'
+
+# DND host name (None means to use the default)
+dnd_host    = format_templates[default_template].get('dnd', None)
+
+# The query format string to use
+dnd_query   = format_templates[default_template]['query']
+
+# Separator for output records
+output_sep  = format_templates[default_template].get('separator', '\n')
+
+# Delimiter between queries
+query_sep   = format_templates[default_template].get('delimiter', '\n')
+
+# Default action
+action      = 'query'
+
+try:
+    (opts, args) = getopt(sys.argv[1:], 'd:fhq:s:S:t:',
+                          [ 'dnd=', 'delim=', 'fields', 'help',
+                            'query=', 'sep=', 'template=' ])
+except GetoptError, e:
+    print >> sys.stderr, \
+          "Error: %s\n -- Use 'dndquery --help' for assistance" % e
+    sys.exit(1)
+
+for (opt, arg) in opts:
+    if opt in ( '-d', '--dnd' ):
+        dnd_host = arg
+        continue
+
+    if opt in ( '-q', '--query' ):
+        dnd_query = arg.replace('\\n', '\n').replace('\\t', '\t')
+        continue
+
+    if opt in ( '-f', '--fields' ):
+        action = 'fields'
+        continue
+
+    if opt in ( '-s', '--sep' ):
+        output_sep = arg.replace('\\n', '\n').replace('\\t', '\t')
+        continue
+
+    if opt in ( '-S', '--delim' ):
+        query_sep = arg.replace('\\n', '\n').replace('\\t', '\t')
+        continue
+
+    if opt in ( '-t', '--template' ):
+        try:
+            t = arg.lower()
+            dnd_host  = format_templates[t].get('dnd', dnd_host)
+            dnd_query = format_templates[t]['query']
+            output_sep = format_templates[t].get('separator', output_sep)
+            query_sep = format_templates[t].get('delimiter', query_sep)
+        except KeyError:
+            print >> sys.stderr, \
+                  "No format template named `%s' is defined." % arg
+            sys.exit(1)
+            
+        continue
+    
+    if opt in ( '-h', '--help' ):
+        print >> sys.stderr, \
+              "Usage: dndquery [-q <format>] [<query>]\n" \
+              "Options include:\n" \
+              "  -d/--dnd <host>     -- specify DND host.\n" \
+              "  -f/--fields         -- print a list of query fields.\n" \
+              "  -h/--help           -- display this message.\n" \
+              "  -q/--query <str>    -- specify query format string.\n" \
+              "  -s/--sep <str>      -- specify record separator in query.\n"  \
+              "  -S/--delim <str>    -- specify record separator " \
+              "between queries.\n"   \
+              "  -t/--template <str> -- specify query template name " \
+              "(see below).\n"
+        
+        tmpl = sorted(format_templates.keys())
+        width = max([ len(t) for t in tmpl ])
+        fmt = "  %%-%ds -- %%s" % (width + 1)
+        print >> sys.stderr, "Predefined templates:"
+        for name, t in ((x, format_templates[x]) for x in tmpl):
+            print >> sys.stderr, \
+                  fmt % (name, t['desc'])
+            if t.has_key('dnd'):
+                print >> sys.stderr, fmt % ('', 'DND:   %s' % t['dnd'])
+            print >> sys.stderr, \
+                  fmt % ('', 'Query: "' + t['query'][:50] .
+                         replace('\n', '\\n').replace('\t', '\\t') +
+                         (((len(t['query']) > 50) and \
+                          ' ...') or '') + '"')
+            print >> sys.stderr
+        
+        sys.stderr.write('\n')
+        sys.exit(0)
+
+try:
+    dnd_server = dnd.DNDSession(server = dnd_host,
+                                debug = (os.getenv('DEBUG') is not None))
+except dnd.DNDError, e:
+    print >> sys.stderr, "Unable to connect to the DND\n -- %s" % e
+    sys.exit(1)
+
+if action == 'fields':
+    fields = sorted(dnd_server.fieldinfo(), key = dnd.DNDField.name)
+    flen   = max(15, max(len(x.name()) for x in fields))
+    kmap = { 'A': 'anyone', 'U': 'user', 'T': 'trusted', 'N': 'nobody' }
+    
+    fmt = "%%-%ds %%-10s %%-10s" % flen
+    print fmt % ( 'Name', 'Read', 'Write' )
+    for elt in fields:
+        print fmt % \
+              ( elt.name(),
+                kmap.get(elt.read(), 'unknown'),
+                kmap.get(elt.write(), 'unknown') )
+    
+    dnd_server.close()
+    sys.exit(0)
+
+if dnd_query is None:
+    dnd_query = default_fmt
+
+query_fields = dnd.get_format_fields(dnd_query)
+if len(args) > 0:
+    query = [ str.join(' ', args) ]
+else:
+    if sys.stdin.isatty():
+        print >> sys.stderr, "[reading from standard input]"
+
+    query = sys.stdin
+
+results = []
+qnum = 0 ; rnum = 0
+for q in query:
+    qnum += 1
+    q = q.strip()
+    if q == '':
+        continue
+    
+    try:
+        result = list(dnd_server.lookup(q, *query_fields))
+    except dnd.DNDError, e:
+        print >> sys.stderr, ">> DND Error: %s: %s" % \
+              (q, e)
+        continue
+
+    # Add special metafields named "#Q" giving the number of the
+    # query, #R giving the number of the record within the query, and
+    # #T giving the overall record number.
+    for p, e in enumerate(result):
+        rnum += 1
+        e['#Q'] = str(qnum)
+        e['#R'] = str(p + 1)
+        e['#T'] = str(rnum)
+    
+    results.append(output_sep.join(dnd.format_fields(dnd_query, e)
+                                   for e in result))
+
+print query_sep.join(results)
+dnd_server.close()
+
+# Here there be dragons

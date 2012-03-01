@@ -1,0 +1,105 @@
+#!/usr/bin/env python
+##
+## Name:     scrapeclass
+## Purpose:  Scrape deptclass name lists out of the DND.
+## Info:     $Id: scrapeclass 745 2007-01-06 19:42:09Z sting $
+##
+## Note:  The whole point of the DND server limiting query results to
+## only 25 matches is to prevent you from casually doing what this
+## script does, namely, building up comprehensive lists of people
+## based on their searchable associations.  This is mostly a proof of
+## concept to demonstrate that rate-limitation is not really good
+## enough.
+##
+## The algorithm used here is to try every possible two-letter query,
+## and whenever that bumps up against the limit, extend it to three or
+## more letters until the ambiguity goes away.  This is not guaranteed
+## to get everybody, but it should get most.
+##
+## To reduce the possibility of tripping log watchers, a random delay
+## is inserted between each pair of queries, and everything is done on
+## a single connexion to the DND.
+## 
+import dnd, getopt, os, sys, time, random
+
+def main(argv):
+    try:
+        opts, args = getopt.getopt(argv, 'd:', ('dnd=',))
+    except getopt.GetoptError, e:
+        print >> sys.stderr, "Usage: scrapeclass [-d <dnd>] <deptclass>+"
+        sys.exit(1)
+
+    host_name = None
+    for opt, arg in opts:
+        if opt in ('-d', '--dnd'):
+            host_name = arg
+    
+    if len(args) == 0:
+        print >> sys.stderr, "Usage: scrapeclass [-d <dnd>] <deptclass>+"
+        sys.exit(1)
+
+    # Share a single DND session among all groups to be queried
+    d = dnd.DNDSession(server = host_name)
+    print >> sys.stderr, "Talking to: %s" % d.hostname()
+    years  = args
+    fnames = list('result-%s.txt' % x.replace("'", '') for x in years)
+    found  = [None] * len(fnames)
+    for pos, fn in enumerate(fnames):
+        fp = file(fn, 'a+')
+        fp.seek(0)
+        found[pos] = set(x.strip() for x in fp)
+        fp.close()
+    
+    query  = [0, 0]
+    try:
+        start = time.time()
+        
+        while True:
+            sys.stderr.write('\r')
+            for pos in xrange(len(fnames)):
+                bq = ''.join(chr(x + ord('a')) for x in query)
+                q = bq + ' %s' % years[pos]
+                sys.stderr.write('%4s [%s: %d] ' %
+                                 (bq, years[pos], len(found[pos])))
+                try:
+                    res = d.lookup(q, 'name')
+
+                    # If there were more matches we didn't get,
+                    # subdivide this query by adding one more term.
+                    if res.more:
+                        query.append(-1)
+                    found[pos].update(x.name for x in res)
+                except dnd.DNDError:
+                    pass # Ignore entries not found
+            
+            sys.stderr.write('%.2f sec.' % (time.time() - start))
+            
+            for pos in reversed(xrange(len(query))):
+                query[pos] += 1
+                if query[pos] == 26:
+                    if len(query) > 2: # Finish subdivisions
+                        query.pop()
+                    else:
+                        query[pos] = 0
+                else: break
+            else:
+                break
+            
+            st = random.randint(0, 4) + random.random()
+            time.sleep(st)
+    except KeyboardInterrupt:
+        print >> sys.stderr, ">> break <<"
+    
+    d.close()
+    for pos, fn in enumerate(fnames):
+        fp = file(fn, 'w+')
+        fp.seek(0)
+        fp.write('\n'.join(found[pos]) + '\n')
+        fp.close()
+    
+    print >> sys.stderr, "<done>"
+
+if __name__ == "__main__":
+    main(sys.argv[1:])
+
+# Here there be dragons

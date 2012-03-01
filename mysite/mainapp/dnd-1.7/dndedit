@@ -1,0 +1,187 @@
+#!/usr/bin/env python
+
+##
+## Name:     dndedit
+## Purpose:  A simple command-line tool to edit DND queries.
+## Author:   M. J. Fromberger <http://www.dartmouth.edu/~sting/>
+##           Copyright (C) 2005 Michael J. Fromberger, All Rights Reserved.
+## Info:     $Id: dndedit 742 2007-01-06 18:49:24Z sting $
+##
+## Permission is hereby granted, free of charge, to any person
+## obtaining a copy of this software and associated documentation
+## files (the "Software"), to deal in the Software without
+## restriction, including without limitation the rights to use, copy,
+## modify, merge, publish, distribute, sublicense, and/or sell copies
+## of the Software, and to permit persons to whom the Software is
+## furnished to do so, subject to the following conditions:
+## 
+## The above copyright notice and this permission notice shall be
+## included in all copies or substantial portions of the Software.
+## 
+## THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+## EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+## MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+## NONINFRINGEMENT.  IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
+## HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
+## WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+## OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
+## DEALINGS IN THE SOFTWARE.
+##
+
+import atexit, dnd, getpass, os, pwd, sys, re
+from getopt import getopt, GetoptError
+from signal import signal as catch_signal, SIGINT, SIG_IGN
+from tempfile import mkstemp
+
+dnd_server  = None    # DND host name (None means to use the default)
+use_pw_env  = False   # True means to read password from DND_PASSWORD
+
+# Cleanup function for temporary files
+def cleanup_temp_file(path):
+    try:
+        os.unlink(path)
+    except:
+        pass
+
+def main():
+    global dnd_server, use_pw_env
+    
+    # Read the user's EDITOR environment variable, or use a default
+    editor_name = os.getenv('EDITOR') or 'vi'
+    
+    try:
+        (opts, args) = getopt(sys.argv[1:], 'd:eh',
+                              [ 'dnd=', 'env', 'help' ])
+    except GetoptError, e:
+        print >> sys.stderr, \
+              "Error: %s\n -- Use 'dndedit --help' for assistance" % e
+        sys.exit(1)
+
+    for (opt, arg) in opts:
+        if opt in ( '-d', '--dnd' ):
+            dnd_server = arg
+            continue
+
+        if opt in ( '-e', '--env' ):
+            use_pw_env = True
+            continue
+    
+        if opt in ( '-h', '--help' ):
+            print >> sys.stderr, \
+"""Usage: dndedit [options] <userid>
+Options include:
+  -d/--dnd <host>     -- specify DND hostname.
+  -e/--env            -- read password from environment (DND_PASSWORD).
+  -h/--help           -- display this help message.
+"""
+            sys.exit(0)
+
+    # If no user name is specified on command line, use pwd
+    if len(args) == 0:
+        user_id = os.getenv('USERNAME') or \
+                  pwd.getpwuid(os.getuid()).pw_gecos.split(',')[0]
+    else:
+        user_id = ' '.join(args)
+
+    # Password either comes from the environment, or is prompted for
+    user_pw = os.getenv('DND_PASSWORD')
+    if not use_pw_env or user_pw is None:
+        user_pw = getpass.getpass("Password for %s: " % user_id)
+    
+    try:
+        the_dnd = dnd.DNDSession(server = dnd_server,
+                                 debug = (os.getenv('DEBUG') is not None))
+    except dnd.DNDError, e:
+        print >> sys.stderr, "Unable to connect to the DND\n -- %s" % e
+        sys.exit(1)
+    
+    rd_fields = set(the_dnd.readable_fields(("any", "user")))
+    wr_fields = set(the_dnd.writable_fields("user"))
+    edit_fields = list(wr_fields & rd_fields)
+    try:
+        user_record = the_dnd.lookup_unique(user_id, *edit_fields)
+    except dnd.DNDError, e:
+        print >> sys.stderr, 'Error looking up "%s":  %s' % (user_id, e)
+        sys.exit(1)
+    
+    # Write the record contents out to a text file, and run the editor
+    (fd, path) = mkstemp()
+    atexit.register(cleanup_temp_file, path)
+    
+    fp = os.fdopen(fd, 'r+')
+    fp.seek(0)
+
+    fp.write('## Edit fields, save and exit when finished\n')
+    for key in sorted(user_record.keys()):
+        fp.write('%s: %s\n' % (key, user_record[key]))
+    
+    fp.flush()
+    
+    print >> sys.stderr, "[waiting for editor]"
+    save_handler = catch_signal(SIGINT, SIG_IGN)
+    os.spawnlp(os.P_WAIT, editor_name, editor_name, path)
+    catch_signal(SIGINT, save_handler)
+
+    # Now read the data back and check for changes
+    fp.seek(0)
+    new_data = {} ; field_fmt = re.compile('(?i)^([a-z]+):(.*)$')
+    line_num = 0
+    for line in fp:
+        line_num += 1
+        line = line.strip()
+        if not line or line[0] == '#':
+            continue
+        match = field_fmt.match(line)
+        if not match:
+            print >> sys.stderr, "Line %d: Invalid data, ignored\n > %s" \
+                  % (line_num, line)
+            continue
+        
+        new_data[match.group(1)] = match.group(2).strip()
+    
+    changed = [ k for k in user_record
+                if k in new_data and user_record[k] <> new_data[k] ]
+    if not changed:
+        print >> sys.stderr, "No changes."
+        return
+    
+    while True:
+        sys.stderr.write("Save %d change%s [y]/n? " %
+                         (len(changed), (len(changed) <> 1 and "s" or "")))
+        ans = sys.stdin.readline()
+        
+        # EOF during read counts as a cancel
+        if not ans:
+            ans = 'n'
+            break
+        
+        ans = ans.strip().lower()
+        
+        # Empty non-EOF counts as default "yes"
+        if not ans:
+            ans = 'y'
+            break
+        
+        if ans in ( 'y', 'yes', 'n', 'no' ):
+            ans = ans[0]
+            break
+        else:
+            print >> sys.stderr, "I'm sorry, I do not understand `%s'" % ans
+    
+    if ans == 'n':
+        print >> sys.stderr, "Changes discarded."
+        return
+
+    # If we get here, changes should be committed
+    try:
+        the_dnd.change_record(user_id, user_pw,
+                              *((f, new_data[f]) for f in changed))
+        print >> sys.stderr, "Changes saved"
+    except dnd.DNDError, e:
+        print >> sys.stderr, "Error while saving changes: %s" % e
+        sys.exit(1)
+
+if __name__ == "__main__":
+    main()
+
+# Here there be dragons
