@@ -17,21 +17,36 @@ import mysite.settings
 import dnd
 
 def get_dnd_info(name):
-    record = d.lookup_unique(name, 'NAME', "NICKNAME", "UID")
-    return recrod
+    d = dnd.DNDSession()
+    record = d.lookup_unique(name, 'NAME', "NICKNAME", "UID", "DEPT")
+    return record
 
-def home(request):
-    data = {}
-    return render_to_response('index.html', data)
-
-def raw_availabilities(request, course_id):
+def availabilities_as_json(course_id):
     relevant_availabilities = StudentAvailability.objects.filter(course_id=course_id).all()
     data = []
     for availability in relevant_availabilities:
         data.append((availability.dnd_name, availability.as_dict()))
     data = dict(data)
-    the_json_str = pprint.pformat(data)
-    return HttpResponse(the_json_str)
+    return pprint.pformat(data)
+
+def home(request):
+    return render_to_response('index.html')
+
+@login_required
+def raw_availabilities(request, course_id):
+    return HttpResponse(availabilities_as_json(course_id))
+
+@login_required
+def assignment(request, course_id):
+    # only let them proceed if they are a professor
+    user_info = get_dnd_info(dnd_name_from_token(request.user.username))
+    if not user_info['dept'] == 'Computer Science':
+        return HttpResponse('you must be a prof in order to see this')
+
+    json_availabilities = availabilities_as_json(course_id)
+    
+
+
 
 def dnd_name_from_token(token):
     return token.split('@')[0]
@@ -48,12 +63,26 @@ def availability_form(request, course_id):
         # get their DND name
         dnd_name = dnd_name_from_token(request.user.username)
 
+        sections_values = dict([(section, '') for section in course_info['sections']])
+
+        data = {}
         prepopulate = False
         # if they have already filled in the form, prepopulate
         sa, new = StudentAvailability.objects.get_or_create(dnd_name=dnd_name)
         if not new:
             prepopulate = True
             is_male = sa.is_male
+            if is_male:
+                data['male_checked'] = 'checked'
+                data['female_checked'] = ''
+            else:
+                data['female_checked'] = 'checked'
+                data['male_checked'] = ''
+            available_sections = json.loads(sa.section_availability_ordered)
+            sections_scores = zip(available_sections, range(1,len(available_sections)+1))
+            for section, score in sections_scores:
+                sections_values[section] = score
+
             #TODO: actually prepopulate
 
         # figure out if they're a TA
@@ -61,22 +90,21 @@ def availability_form(request, course_id):
         if dnd_name in course_info['TAs']:
             is_ta = True
 
-        data = {
+        data.update({
             'course_id' : course_id,
-            'sections' : course_info['sections'],
+            'sections_values' : sections_values,
             'is_ta' : is_ta,
             'students' : course_info['students'],
             'dnd_name' : dnd_name,
             'action' : request.get_full_path().split('?')[0],
             'success' : request.GET.get('success', False),
             'invalid' : request.GET.get('invalid', False),
-            }
+            })
         return render_to_response('availability_form.html', data)
 
     # HANDLE THE FORM INPUT
     elif request.method == 'POST':
         def form_is_valid(post_data):
-            print post_data
             if not post_data.get('is_male', False):
                 return False
             if not post_data.get('is_ta', False):
@@ -91,11 +119,14 @@ def availability_form(request, course_id):
         # get their DND name
         # (we got one from post, but let's not trust it)
         dnd_name = dnd_name_from_token(request.user.username)
+        is_ta = False
+        if dnd_name in course_info['TAs']:
+            is_ta = True
 
         sa, new = StudentAvailability.objects.get_or_create(dnd_name=dnd_name)
         sa.course_id = course_id
         sa.is_male = request.POST['is_male']
-        sa.is_ta = request.POST['is_ta']
+        sa.is_ta = is_ta
 
         # get the cant be with
         if request.POST.get('cant_be_with', False):

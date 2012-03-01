@@ -34,16 +34,18 @@ If that's wrong, <a href="/accounts/logout">click here</a>
 <input type="hidden" name="dnd_name" value="{{ dnd_name }}" />
 
 Gender: <br />
-<input type="radio" name="is_male" value="1" id="gen1" checked="checked" /> <label for="gen1">Male</label><br />
-<input type="radio" name="is_male" value="0" id="gen2" /> <label for="gen2">Female</label> <br />
+<input type="radio" name="is_male" value="1" id="gen1" {% if male_checked %}checked="checked"{% endif %} /> <label for="gen1">Male</label><br />
+<input type="radio" name="is_male" value="0" id="gen2" {% if female_checked %}checked="checked"{% endif %}/> <label for="gen2">Female</label> <br />
+<!--
 <input type="radio" name="is_male" value="0" id="gen3" /> <label for="gen3">Other/Prefer not to say</label> <br />
+-->
 <input type="hidden" name="is_ta" value="{{ is_ta }}" />
 
 <br />
 Available Section Times: <br />
 <fieldset>
-{% for section in sections %}
-<input type="text" name="{{section}}" value=""> {{section}} <br />
+{% for section, value in sections_values.items %}
+<input type="text" name="{{section}}" value="{{value}}"> {{section}} <br />
 {% endfor %}
 </fieldset>
 

@@ -22,4 +22,5 @@ urlpatterns = patterns('',
 
     (r'^enter_info/(?P<course_id>\w+)$', 'mysite.mainapp.views.availability_form'),
     (r'^raw_availabilities/(?P<course_id>\w+)$', 'mysite.mainapp.views.raw_availabilities'),
+    (r'^assignment/(?P<course_id>\w+)$', 'mysite.mainapp.views.assignment'),
 )
