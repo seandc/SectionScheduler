@@ -43,6 +43,7 @@ Gender: <br />
 
 <br />
 Available Section Times: <br />
+<small>Rank them in order of preference (1 is most preferred). Leave blank if you absolutely cannot attend.</small> <br />
 <fieldset>
 {% for section, value in sections_values.items %}
 <input type="text" name="{{section}}" value="{{value}}"> {{section}} <br />
