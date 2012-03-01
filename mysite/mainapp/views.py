@@ -56,6 +56,7 @@ def availability_form(request, course_id):
         data = {
             'sections' : course_info['sections'],
             'is_ta' : is_ta,
+            'students' : course_info['students'],
             'dnd_name' : dnd_name,
             'action' : request.get_full_path(),
             'success' : request.GET.get('success', False),
@@ -67,9 +68,8 @@ def availability_form(request, course_id):
         # (we got one from post, but let's not trust it)
         dnd_name = dnd_name_from_token(request.user.username)
 
-        sa = StudentAvailability()
+        sa = StudentAvailability.objects.get_or_create(dnd_name=dnd_name)[1]
         sa.course_id = course_id
-        sa.dnd_name = dnd_name
         sa.is_male = request.POST['is_male']
         sa.is_ta = request.POST['is_ta']
 

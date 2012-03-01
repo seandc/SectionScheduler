@@ -12,18 +12,31 @@ Register for a CS course section here
 <form method="POST" action="{{action}}">
 <fieldset>
 <input type="hidden" name="dnd_name" value="{{ dnd_name }}" />
-<input type="checkbox" name="is_male" value="1" /> Are a guy? <br />
+
+Gender: <br />
+<input type="radio" name="is_male" value="1" id="gen1" /> <label for="gen1">Male</label><br />
+<input type="radio" name="is_male" value="0" id="gen2" /> <label for="gen2">Female</label> <br />
+<input type="radio" name="is_male" value="0" id="gen3" /> <label for="gen3">Other/Prefer not to say</label> <br />
 <input type="hidden" name="is_ta" value="{{ is_ta }}" />
+
+<br />
+Available Section Times: <br />
 <fieldset>
 {% for section in sections %}
 <input type="checkbox" name="{{section}}" value="1"> {{section}} <br />
 {% endfor %}
 </fieldset>
+
+
+<br />
 {% if is_ta %}
 Say who you can't be with: <br />
 <textarea name="cant_be_with">
 </textarea>
 {% endif %}
+
+
+<br />
 <input type="submit" value="Submit" />
 </fieldset>
 </form>
