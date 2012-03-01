@@ -48,7 +48,13 @@ def availability_form(request, course_id):
         # get their DND name
         dnd_name = dnd_name_from_token(request.user.username)
 
-        # TODO: if they have already filled in the form, prepopulate
+        prepopulate = False
+        # if they have already filled in the form, prepopulate
+        sa, new = StudentAvailability.objects.get_or_create(dnd_name=dnd_name)
+        if not new:
+            prepopulate = True
+            is_male = sa.is_male
+            #TODO: actually prepopulate
 
         # figure out if they're a TA
         is_ta = False
@@ -71,13 +77,13 @@ def availability_form(request, course_id):
         # (we got one from post, but let's not trust it)
         dnd_name = dnd_name_from_token(request.user.username)
 
-        sa = StudentAvailability.objects.get_or_create(dnd_name=dnd_name)[0]
+        sa, new = StudentAvailability.objects.get_or_create(dnd_name=dnd_name)
         sa.course_id = course_id
         sa.is_male = request.POST['is_male']
         sa.is_ta = request.POST['is_ta']
 
         # TODO: get the cant be with
-        cant_be_with = []
+        cant_be_with = [key.replace('cant_be_with', '') for key in request.POST.keys() if 'cant_be_with' in key]
 
         # TODO: get the section availability
         priority_sections = []
