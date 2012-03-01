@@ -16,31 +16,6 @@ import cas
 import urllib
 import mysite.settings
 
-CAS_ENDPOINT_URL = "https://login.dartmouth.edu/cas/"
-WEBAPP_LOGIN_URL = "http://google.com"
-
-def webauth(request, ticket=None):
-    service_url = 'http://'+ request.get_host() + request.get_full_path() #TODO: this isnt a full url
-    print service_url
-    def validate(ticket):
-        val_url = CAS_ENDPOINT_URL + "validate" + \
-            '?service=' + urllib.quote(service_url) + \
-            '&ticket=' + urllib.quote(ticket)
-        r = urllib.urlopen(val_url).readlines()    # returns 2 lines
-        if len(r) == 2 and re.match("yes", r[0]) != None:
-            return r[1].strip()
-        return None
-
-    if ticket:
-        id = validate(ticket)
-        if id:
-            return id
-    # No valid ticket; redirect the browser to the login page to get one
-    login_url = CAS_ENDPOINT_URL + 'login' \
-    + '?service=' + urllib.quote(service_url)
-    # return the redirect
-    return HttpResponseRedirect(login_url)
-
 def home(request):
     data = {}
     return render_to_response('index.html', data)
@@ -56,17 +31,6 @@ def raw_availabilities(request, course_id):
 
 @login_required
 def availability_form(request, course_id):
-    print "=="
-    print request.user
-    print "=="
-    #if request.user
-    '''
-    ticket_or_redirect = webauth(request, ticket=None)
-    if type(ticket_or_redirect) == HttpResponseRedirect:
-        return ticket_or_redirect
-    dnd_name = ticket_or_redirect
-    print dnd_name
-    '''
 
     # get the  course info from the config file
     course_info = courses.courses[course_id]
@@ -85,8 +49,8 @@ def availability_form(request, course_id):
         # TODO: figure out if they're male
         is_male = True
 
-        # TODO: get their DND name
-        dnd_name = 'Alice'
+        # get their DND name
+        dnd_name = request.user.username
 
         data = {
             'sections' : course_info['sections'],
