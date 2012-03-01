@@ -16,10 +16,15 @@ import urllib
 import mysite.settings
 import dnd
 
+# HELPERS
+
 def get_dnd_info(name):
     d = dnd.DNDSession()
     record = d.lookup_unique(name, 'NAME', "NICKNAME", "UID", "DEPT")
     return record
+
+def dnd_name_from_token(token):
+    return token.split('@')[0]
 
 def availabilities_as_json(course_id):
     relevant_availabilities = StudentAvailability.objects.filter(course_id=course_id).all()
@@ -28,6 +33,9 @@ def availabilities_as_json(course_id):
         data.append((availability.dnd_name, availability.as_dict()))
     data = dict(data)
     return pprint.pformat(data)
+
+
+# VIEWS
 
 def home(request):
     return render_to_response('index.html')
@@ -42,14 +50,9 @@ def assignment(request, course_id):
     user_info = get_dnd_info(dnd_name_from_token(request.user.username))
     if not user_info['dept'] == 'Computer Science':
         return HttpResponse('you must be a prof in order to see this')
-
     json_availabilities = availabilities_as_json(course_id)
-    
+    # TODO
 
-
-
-def dnd_name_from_token(token):
-    return token.split('@')[0]
 
 @login_required
 def availability_form(request, course_id):
@@ -67,7 +70,7 @@ def availability_form(request, course_id):
 
         data = {}
         prepopulate = False
-        # if they have already filled in the form, prepopulate
+        # PREPOPULATING FORM DATA
         sa, new = StudentAvailability.objects.get_or_create(dnd_name=dnd_name)
         if not new:
             prepopulate = True
@@ -82,8 +85,6 @@ def availability_form(request, course_id):
             sections_scores = zip(available_sections, range(1,len(available_sections)+1))
             for section, score in sections_scores:
                 sections_values[section] = score
-
-            #TODO: actually prepopulate
 
         # figure out if they're a TA
         is_ta = False
@@ -104,6 +105,8 @@ def availability_form(request, course_id):
 
     # HANDLE THE FORM INPUT
     elif request.method == 'POST':
+
+        # test that form input is valid
         def form_is_valid(post_data):
             if not post_data.get('is_male', False):
                 return False
@@ -116,24 +119,26 @@ def availability_form(request, course_id):
             # tell them to re-do the form
             redirect_url = request.get_full_path() + '?invalid=1'
             return HttpResponseRedirect(redirect_url)
+
+
         # get their DND name
         # (we got one from post, but let's not trust it)
         dnd_name = dnd_name_from_token(request.user.username)
         is_ta = False
         if dnd_name in course_info['TAs']:
             is_ta = True
+        sa.is_ta = is_ta
+        sa.course_id = course_id
 
         sa, new = StudentAvailability.objects.get_or_create(dnd_name=dnd_name)
-        sa.course_id = course_id
         sa.is_male = request.POST['is_male']
-        sa.is_ta = is_ta
 
         # get the cant be with
         if request.POST.get('cant_be_with', False):
             cant_be_with = request.POST.getlist('cant_be_with')
             sa.cant_be_with = json.dumps(cant_be_with)
 
-        # TODO: get the section availability
+        # get the section availability
         priority_sections = []
         for section in course_info['sections']:
             priority = request.POST.get(section, '')
