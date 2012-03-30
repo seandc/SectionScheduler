@@ -14,9 +14,15 @@ class StudentAvailability(models.Model):
     cant_be_with = models.TextField()
     section_availability_ordered = models.TextField()
     def as_dict(self):
+        cant_be_with_json = {}
+        section_availability_ordered_json = {}
+        if self.cant_be_with:
+            cant_be_with_json = json.loads(self.cant_be_with)
+        if self.section_availability_ordered:
+            section_availability_ordered_json = json.loads(self.section_availability_ordered)
         return {
             'is_ta' : self.is_ta,
             'is_male' : self.is_male,
-            'cant_be_with' : json.loads(self.cant_be_with),
-            'section_availability_ordered' : json.loads(self.section_availability_ordered),
+            'cant_be_with' : cant_be_with_json,
+            'section_availability_ordered' : section_availability_ordered_json,
             }
